@@ -86,6 +86,7 @@ body {
   cursor: pointer;
   margin: 5px 5px 0 5px;
   border: none;
+  background-color: white;
 }
 
 .icons--style {

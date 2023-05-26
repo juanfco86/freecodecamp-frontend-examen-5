@@ -3,15 +3,25 @@ import './App.css';
 import Footer from './Components/Footer/Footer';
 import { useEffect } from 'react';
 
+// FALTA HACER FUNCIONAL EL BOTON DE PAUSE
+// CUANDO LLEGA A 0 SE PONE EL CONTADOR DE BREAK PERO SIGUE BAJANDO LA CUENTA AUTOMATICAMENTE
+// BREAK TAMPOCO SE PARA EL CONTADOR AL CLIKEAR EN RESET
+
 function App() {
   const [breakLabel, setBreakLabel] = useState(5);
   const [sessionLabel, setSessionLabel] = useState(25);
   const [result, setResult] = useState(`${sessionLabel}:00`)
   const [timerStatusSession, setTimerStatusSession] = useState(false)
   const [timerStatusBreak, setTimerStatusBreak] = useState(false)
+  const [countdown, setCountdown] = useState(null)
+  
 
   useEffect(() => {
-    setResult(`${sessionLabel}:00`)
+    if (sessionLabel < 10) {
+      setResult(`0${sessionLabel}:00`)
+    } else {
+      setResult(`${sessionLabel}:00`)
+    }
   }, [sessionLabel]);
   
   const updateCountSession = (minutes, seconds) => {
@@ -28,28 +38,35 @@ function App() {
   
   const timer = () => {
     let seconds = 0;
-    let minutes = sessionLabel
-    setTimerStatusSession(true)
+    let minutes = sessionLabel;
 
-    const countdown = setInterval(() => {
-      seconds--;
-      if (seconds < 0) {
-        seconds = 59;
-        minutes--;
-      }
-      const duration = updateCountSession(minutes, seconds)
-
-      if (minutes === 0 && seconds === 0) {
-        clearInterval(countdown);
-        console.log('TIEMPO FINALIZADO');
-      }
-      setResult(duration);
-
-      return result;
-    }, 1000)
-
+    if (!timerStatusSession) {
+      setTimerStatusSession(true)
+      setCountdown(setInterval(() => {
+        seconds--;
+        if (seconds < 0) {
+          seconds = 59;
+          minutes--;
+        }
+        const duration = updateCountSession(minutes, seconds)
+        if (minutes === 0 && seconds === 0 && !timerStatusBreak) {
+          minutes = breakLabel
+          setTimerStatusSession(false)
+          setResult(`${breakLabel}:00`)
+          setTimerStatusBreak(true)
+          clearInterval(countdown);
+        } else if (minutes === 0 && seconds === 0 && timerStatusBreak) {
+          setResult(`${sessionLabel}:00`)
+          setTimerStatusBreak(false)
+          clearInterval(countdown);
+        }
+        setResult(duration);
+  
+        return result;
+        
+      }, 1000))
+    }
   }
-
 
   const breakDecrement = () => {
     if (breakLabel > 0) {
@@ -62,6 +79,8 @@ function App() {
   const breakIncrement = () => {
     if (breakLabel < 60) {
       setBreakLabel(breakLabel + 1)
+    } else if (breakLabel <= 0) {
+      setBreakLabel(0)
     } else {
       setBreakLabel(60);
     }
@@ -84,8 +103,12 @@ function App() {
   }
 
   const resetAll = () => {
+    clearInterval(countdown);
     setBreakLabel(5);
     setSessionLabel(25);
+    setTimerStatusSession(false);
+    setCountdown(null)
+    setResult(`${sessionLabel}:00`);
   }
 
   return (
@@ -115,7 +138,11 @@ function App() {
             </div>
         </div>
         <div id="time-left">
-          <h6 id="timer-label">Session</h6>
+            <h6 id="timer-label">
+              {
+                !timerStatusBreak ? 'Session' : 'Break'
+              }  
+            </h6>
             <p className='time-value'>
               {
                 result
