@@ -1,78 +1,168 @@
-import { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import './App.css';
 import Footer from './Components/Footer/Footer';
-import { useEffect } from 'react';
-
-// FALTA HACER FUNCIONAL EL BOTON DE PAUSE
-// CUANDO LLEGA A 0 SE PONE EL CONTADOR DE BREAK PERO SIGUE BAJANDO LA CUENTA AUTOMATICAMENTE
-// BREAK TAMPOCO SE PARA EL CONTADOR AL CLIKEAR EN RESET
 
 function App() {
   const [breakLabel, setBreakLabel] = useState(5);
   const [sessionLabel, setSessionLabel] = useState(25);
   const [result, setResult] = useState(`${sessionLabel}:00`)
+  const [timerStatus, setTimerStatus] = useState(false)
   const [timerStatusSession, setTimerStatusSession] = useState(false)
   const [timerStatusBreak, setTimerStatusBreak] = useState(false)
   const [countdown, setCountdown] = useState(null)
-  
+  const [pause, setPause]  = useState(false)
+  const beepAudio = useRef(null)
 
   useEffect(() => {
-    if (sessionLabel < 10) {
+    if ((sessionLabel < 10 && timerStatusSession) || (sessionLabel < 10 && !timerStatusBreak && !timerStatusSession)) {
       setResult(`0${sessionLabel}:00`)
-    } else {
+    } else if ((sessionLabel <= 0 && timerStatusSession) || (sessionLabel <= 0 && !timerStatusBreak && !timerStatusSession)) {
+      setResult(`${breakLabel}:00`)
+    } else if ((sessionLabel >= 10 && timerStatusSession) || (sessionLabel >= 10 && !timerStatusBreak && !timerStatusSession)) {
       setResult(`${sessionLabel}:00`)
+    } else if (breakLabel < 10 && timerStatusBreak) {
+      setResult(`0${breakLabel}:00`)
+    } else if (breakLabel >= 10 && timerStatusBreak) {
+      setResult(`${breakLabel}:00`)
     }
-  }, [sessionLabel]);
+  }, [sessionLabel, breakLabel, timerStatusBreak, timerStatusSession]);
+
+  useEffect(() => {
+    if (!pause) {
+      let interval = null;
+      setPause(false)
+      if (timerStatus) {
+        interval = setInterval(() => {
+          setResult(prevResult => {
+            let seconds = parseInt(prevResult.split(':')[1]);
+            let minutes = parseInt(prevResult.split(':')[0]);
+  
+            seconds--;
+  
+            if (seconds < 0) {
+              seconds = 59;
+              minutes--;
+            }
+  
+            const updatedResult = `${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+  
+            if (minutes <= 0 && seconds === 0) {
+              beepAudio.current.play()
+              clearInterval(interval);
+  
+              if (!timerStatusBreak) {
+                minutes = breakLabel
+                setTimerStatusSession(false);
+                setTimerStatusBreak(true);
+                setCountdown(null);
+              } else {
+                setResult(`${sessionLabel}:00`)
+                setTimerStatusBreak(false);
+                setTimerStatusSession(true);
+                // setCountdown(null);
+              }
+            }
+  
+            return updatedResult;
+          });
+        }, 100);
+      }
+      setCountdown(interval);
+    }
+  }, [pause, timerStatus, timerStatusBreak, timerStatusSession]);
+
+  useEffect(() => {
+    return () => {
+      clearInterval(countdown)
+    } 
+  }, [countdown, pause]);
   
   const updateCountSession = (minutes, seconds) => {
-    if (seconds < 10) {
-      return `${minutes}:0${seconds}`
+    if (minutes < 10 && seconds < 10) {
+      return `0${minutes}:0${seconds}`
     } else if (minutes < 10) {
       return `0${minutes}:${seconds}`;
-    } else if (minutes < 10 && seconds < 10) {
-      return `0${minutes}:0${seconds}`;
+    } else if (seconds < 10) {
+      return `${minutes}:0${seconds}`;
     } else {
       return `${minutes}:${seconds}`;
     }
   }
   
   const timer = () => {
-    let seconds = 0;
-    let minutes = sessionLabel;
-
-    if (!timerStatusSession) {
-      setTimerStatusSession(true)
-      setCountdown(setInterval(() => {
-        seconds--;
-        if (seconds < 0) {
-          seconds = 59;
-          minutes--;
-        }
-        const duration = updateCountSession(minutes, seconds)
-        if (minutes === 0 && seconds === 0 && !timerStatusBreak) {
-          minutes = breakLabel
-          setTimerStatusSession(false)
-          setResult(`${breakLabel}:00`)
-          setTimerStatusBreak(true)
-          clearInterval(countdown);
-        } else if (minutes === 0 && seconds === 0 && timerStatusBreak) {
-          setResult(`${sessionLabel}:00`)
-          setTimerStatusBreak(false)
-          clearInterval(countdown);
-        }
-        setResult(duration);
-  
-        return result;
+    if (!timerStatus) {
+      setResult(`${sessionLabel < 10 ? '0' + sessionLabel : sessionLabel}:00`)
+      setPause(false)
+      setTimeout(() => {
+        setTimerStatus(true);
+        let seconds = 0;
+        let minutes;
         
-      }, 1000))
+        if (!timerStatusSession && !timerStatusBreak) {
+          minutes = sessionLabel;
+          setTimerStatusSession(true)
+          setResult(`${minutes}:${seconds}`)
+        } else if (!timerStatusSession && timerStatusBreak) {
+          minutes = breakLabel;
+          setTimerStatusBreak(true)
+          if (minutes < 10) {
+            setResult(`0${minutes}:${seconds}`)
+          } else {
+            setResult(`${minutes}:${seconds}`)
+          }
+        } else if (!timerStatusBreak && timerStatusSession) {
+          minutes = sessionLabel;
+          setTimerStatusSession(true)
+          setResult(`${minutes}:${seconds}`)
+        }
+
+        let interval = setInterval(() => {
+          if (!pause) {
+              seconds--;
+              if (seconds < 0) {
+                seconds = 59;
+                minutes--;
+              }
+
+              const duration = updateCountSession(minutes, seconds)
+              setResult(duration)
+
+              if (minutes <= 0 && seconds === 0) {
+                setTimerStatus(false)
+
+                if (!timerStatusBreak) {
+                  minutes = breakLabel
+                  setResult(`${minutes}:${seconds}`)
+                  setTimerStatusSession(false)
+                  setTimerStatusBreak(true)
+                  clearInterval(countdown);
+                  timer()
+                } else {
+                  console.log('entro');
+                  setResult(`${sessionLabel}:00`)
+                  setTimerStatusBreak(false)
+                  setTimerStatus(false)
+                  setTimerStatusSession(true)
+                  setPause(true)
+                  clearInterval(countdown);
+                }
+              }
+              setResult(duration);
+              return result;
+            }
+          }, 1000)
+          setCountdown(interval)
+        }, 10)
+      } else {
+        setPause(!pause)
+      } 
     }
-  }
 
   const breakDecrement = () => {
-    if (breakLabel > 0) {
+    if (breakLabel > 1) {
       setBreakLabel(breakLabel - 1)
     } else {
-      setBreakLabel(0);
+      setBreakLabel(1);
     }
   }
 
@@ -87,10 +177,10 @@ function App() {
   }
 
   const sessionDecrement = () => {
-    if (sessionLabel > 0) {
+    if (sessionLabel > 1) {
       setSessionLabel(sessionLabel - 1)
     } else {
-      setSessionLabel(0);
+      setSessionLabel(1);
     }
   }
 
@@ -104,11 +194,15 @@ function App() {
 
   const resetAll = () => {
     clearInterval(countdown);
-    setBreakLabel(5);
     setSessionLabel(25);
+    setBreakLabel(5);
+    setTimerStatus(false)
     setTimerStatusSession(false);
+    setTimerStatusBreak(false);
     setCountdown(null)
-    setResult(`${sessionLabel}:00`);
+    setPause(false)
+    const defaultResult = `${25}:00`
+    setResult(defaultResult);
   }
 
   return (
@@ -137,13 +231,13 @@ function App() {
                 </button>
             </div>
         </div>
-        <div id="time-left">
+        <div className='container-time-left'>
             <h6 id="timer-label">
               {
                 !timerStatusBreak ? 'Session' : 'Break'
               }  
             </h6>
-            <p className='time-value'>
+            <p id="time-left" className='time-value'>
               {
                 result
               }
@@ -152,7 +246,9 @@ function App() {
         <div className='container--icons'>
           <button id="start_stop" className="button--style" onClick={ timer }>
             {
-              !timerStatusSession ? <i className="bi bi-play-circle-fill icons--style"></i> : <i className="bi bi-pause-circle-fill icons--style"></i>
+              !timerStatus ?  <i className={`bi bi-play-circle-fill icons--style`}></i> :
+              pause ?         <i className={`bi bi-play-circle-fill icons--style`}></i> :
+                              <i className={`bi bi-pause-circle-fill icons--style`}></i>
             }
           </button>
           <button id="reset" className="button--style" onClick={ resetAll }>
@@ -163,7 +259,10 @@ function App() {
         
         <Footer />
 
-        {/* AUDIO CON UN SONIDO BEEP PARA FINALIZAR? */}
+        <audio id="beep" ref={ beepAudio }>
+          <source src="https://res.cloudinary.com/dgquecmyz/video/upload/v1686254527/Beep_Short_01_Sound_Effect_Mp3_102_xfkfzo.mp3" type="audio/mp3" />
+          Your browser does not support the audio element.
+        </audio>
 
       </div>
     </>

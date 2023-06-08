@@ -57,7 +57,7 @@ body {
   color: whitesmoke;
 }
 
-#time-left {
+.container-time-left {
   border: 3px solid black;
   border-radius: 15px;
   background-color: rgb(250, 76, 76);
