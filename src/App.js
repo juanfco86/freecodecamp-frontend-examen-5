@@ -3,29 +3,34 @@ import './App.css';
 import Footer from './Components/Footer/Footer';
 
 function App() {
-  const [breakLabel, setBreakLabel] = useState(5);
-  const [sessionLabel, setSessionLabel] = useState(25);
-  const [result, setResult] = useState(`${sessionLabel}:00`)
+  const [breakLabel, setBreakLabel] = useState(5*60);
+  const [sessionLabel, setSessionLabel] = useState(25*60);
   const [timerStatus, setTimerStatus] = useState(false)
   const [timerStatusSession, setTimerStatusSession] = useState(false)
   const [timerStatusBreak, setTimerStatusBreak] = useState(false)
   const [countdown, setCountdown] = useState(null)
   const [pause, setPause]  = useState(false)
   const beepAudio = useRef(null)
+  
+  const formatTime = (time) => {
+    let minutes = Math.floor(time/60)
+    let seconds = time % 60
+    return (
+        (minutes < 10 ? '0' + minutes : minutes) + ':' + (seconds < 10 ? '0' + seconds : seconds)
+      )
+    }
+    
+  const [result, setResult] = useState(formatTime(25 * 60))
 
   useEffect(() => {
-    if ((sessionLabel < 10 && timerStatusSession) || (sessionLabel < 10 && !timerStatusBreak && !timerStatusSession)) {
-      setResult(`0${sessionLabel}:00`)
-    } else if ((sessionLabel <= 0 && timerStatusSession) || (sessionLabel <= 0 && !timerStatusBreak && !timerStatusSession)) {
-      setResult(`${breakLabel}:00`)
-    } else if ((sessionLabel >= 10 && timerStatusSession) || (sessionLabel >= 10 && !timerStatusBreak && !timerStatusSession)) {
-      setResult(`${sessionLabel}:00`)
-    } else if (breakLabel < 10 && timerStatusBreak) {
-      setResult(`0${breakLabel}:00`)
-    } else if (breakLabel >= 10 && timerStatusBreak) {
-      setResult(`${breakLabel}:00`)
+    if (!timerStatusSession && !timerStatus) {
+      setResult(formatTime(sessionLabel))
+    } else if (timerStatusBreak) {
+      setResult(formatTime(breakLabel))
+    } else {
+      setResult(formatTime(sessionLabel))
     }
-  }, [sessionLabel, breakLabel, timerStatusBreak, timerStatusSession]);
+  }, [sessionLabel, breakLabel, timerStatusBreak, timerStatusSession, timerStatus]);
 
   useEffect(() => {
     if (!pause) {
@@ -36,40 +41,37 @@ function App() {
           setResult(prevResult => {
             let seconds = parseInt(prevResult.split(':')[1]);
             let minutes = parseInt(prevResult.split(':')[0]);
-  
+
             seconds--;
-  
             if (seconds < 0) {
               seconds = 59;
               minutes--;
             }
   
-            const updatedResult = `${minutes < 10 ? '0' + minutes : minutes}:${seconds < 10 ? '0' + seconds : seconds}`;
+            const updatedResult = formatTime(minutes * 60 + seconds)
   
-            if (minutes <= 0 && seconds === 0) {
+            if (prevResult === '00:00') {
               beepAudio.current.play()
               clearInterval(interval);
   
               if (!timerStatusBreak) {
-                minutes = breakLabel
+                setResult(formatTime(breakLabel))
                 setTimerStatusSession(false);
                 setTimerStatusBreak(true);
                 setCountdown(null);
               } else {
-                setResult(`${sessionLabel}:00`)
+                setResult(formatTime(sessionLabel))
                 setTimerStatusBreak(false);
                 setTimerStatusSession(true);
-                // setCountdown(null);
               }
             }
-  
             return updatedResult;
           });
         }, 100);
       }
       setCountdown(interval);
     }
-  }, [pause, timerStatus, timerStatusBreak, timerStatusSession]);
+  }, [pause, timerStatus, timerStatusBreak, timerStatusSession, breakLabel, sessionLabel]);
 
   useEffect(() => {
     return () => {
@@ -77,134 +79,75 @@ function App() {
     } 
   }, [countdown, pause]);
   
-  const updateCountSession = (minutes, seconds) => {
-    if (minutes < 10 && seconds < 10) {
-      return `0${minutes}:0${seconds}`
-    } else if (minutes < 10) {
-      return `0${minutes}:${seconds}`;
-    } else if (seconds < 10) {
-      return `${minutes}:0${seconds}`;
-    } else {
-      return `${minutes}:${seconds}`;
-    }
-  }
   
   const timer = () => {
     if (!timerStatus) {
-      setResult(`${sessionLabel < 10 ? '0' + sessionLabel : sessionLabel}:00`)
+      setResult(formatTime(sessionLabel))
       setPause(false)
-      setTimeout(() => {
-        setTimerStatus(true);
-        let seconds = 0;
-        let minutes;
+      setTimerStatus(true);
         
-        if (!timerStatusSession && !timerStatusBreak) {
-          minutes = sessionLabel;
-          setTimerStatusSession(true)
-          setResult(`${minutes}:${seconds}`)
-        } else if (!timerStatusSession && timerStatusBreak) {
-          minutes = breakLabel;
-          setTimerStatusBreak(true)
-          if (minutes < 10) {
-            setResult(`0${minutes}:${seconds}`)
-          } else {
-            setResult(`${minutes}:${seconds}`)
-          }
-        } else if (!timerStatusBreak && timerStatusSession) {
-          minutes = sessionLabel;
-          setTimerStatusSession(true)
-          setResult(`${minutes}:${seconds}`)
-        }
-
-        let interval = setInterval(() => {
-          if (!pause) {
-              seconds--;
-              if (seconds < 0) {
-                seconds = 59;
-                minutes--;
-              }
-
-              const duration = updateCountSession(minutes, seconds)
-              setResult(duration)
-
-              if (minutes <= 0 && seconds === 0) {
-                setTimerStatus(false)
-
-                if (!timerStatusBreak) {
-                  minutes = breakLabel
-                  setResult(`${minutes}:${seconds}`)
-                  setTimerStatusSession(false)
-                  setTimerStatusBreak(true)
-                  clearInterval(countdown);
-                  timer()
-                } else {
-                  console.log('entro');
-                  setResult(`${sessionLabel}:00`)
-                  setTimerStatusBreak(false)
-                  setTimerStatus(false)
-                  setTimerStatusSession(true)
-                  setPause(true)
-                  clearInterval(countdown);
-                }
-              }
-              setResult(duration);
-              return result;
-            }
-          }, 1000)
-          setCountdown(interval)
-        }, 10)
-      } else {
-        setPause(!pause)
-      } 
-    }
-
-  const breakDecrement = () => {
-    if (breakLabel > 1) {
-      setBreakLabel(breakLabel - 1)
+      if (!timerStatusSession && !timerStatusBreak) {
+        setTimerStatusSession(true)
+        setResult(formatTime(sessionLabel))
+      } else if (!timerStatusSession && timerStatusBreak) {
+        setTimerStatusBreak(true)
+        setResult(formatTime(breakLabel))
+      } else if (!timerStatusBreak && timerStatusSession) {
+        setTimerStatusSession(true)
+        setResult(formatTime(sessionLabel))
+      }
     } else {
-      setBreakLabel(1);
-    }
+      setPause(!pause)
+    } 
   }
 
-  const breakIncrement = () => {
-    if (breakLabel < 60) {
-      setBreakLabel(breakLabel + 1)
-    } else if (breakLabel <= 0) {
-      setBreakLabel(0)
+  const breakDecrement = () => {
+    if (breakLabel > 60) {
+      setBreakLabel(breakLabel - 60)
     } else {
       setBreakLabel(60);
     }
   }
 
-  const sessionDecrement = () => {
-    if (sessionLabel > 1) {
-      setSessionLabel(sessionLabel - 1)
+  const breakIncrement = () => {
+    if (breakLabel < 3600) {
+      setBreakLabel(breakLabel + 60)
+    } else if (breakLabel <= 0) {
+      setBreakLabel(0)
     } else {
-      setSessionLabel(1);
+      setBreakLabel(3600);
     }
   }
 
-  const sessionIncrement = () => {
-    if (sessionLabel < 60) {
-      setSessionLabel(sessionLabel + 1)
+  const sessionDecrement = () => {
+    if (sessionLabel > 60) {
+      setSessionLabel(sessionLabel - 60)
     } else {
       setSessionLabel(60);
     }
   }
 
+  const sessionIncrement = () => {
+    if (sessionLabel < 3600) {
+      setSessionLabel(sessionLabel + 60)
+    } else {
+      setSessionLabel(3600);
+    }
+  }
+
   const resetAll = () => {
     clearInterval(countdown);
-    setSessionLabel(25);
-    setBreakLabel(5);
+    setSessionLabel(25*60);
+    setBreakLabel(5*60);
+    setResult(formatTime(25*60));
     setTimerStatus(false)
     setTimerStatusSession(false);
     setTimerStatusBreak(false);
-    setCountdown(null)
     setPause(false)
-    const defaultResult = `${25}:00`
-    setResult(defaultResult);
+    beepAudio.current.pause()
+    beepAudio.current.load()
   }
-
+  
   return (
     <>
       <div className='container'>
@@ -215,7 +158,7 @@ function App() {
                 <button id="break-decrement" onClick={ breakDecrement }>
                   <i className="bi bi-dash-circle"></i>
                 </button>
-                <p id="break-length">{ breakLabel }</p>
+                <p id="break-length">{ breakLabel / 60 }</p>
                 <button id="break-increment" onClick={ breakIncrement }>
                   <i className="bi bi-plus-circle"></i>
                 </button>
@@ -225,7 +168,7 @@ function App() {
                 <button id="session-decrement" onClick={ sessionDecrement }>
                   <i className="bi bi-dash-circle"></i>
                 </button>
-                <p id="session-length">{ sessionLabel }</p>
+                <p id="session-length">{ sessionLabel / 60 }</p>
                 <button id="session-increment" onClick={ sessionIncrement }>
                   <i className="bi bi-plus-circle"></i>
                 </button>
@@ -234,7 +177,7 @@ function App() {
         <div className='container-time-left'>
             <h6 id="timer-label">
               {
-                !timerStatusBreak ? 'Session' : 'Break'
+                !timerStatusBreak ? 'session' : 'break'
               }  
             </h6>
             <p id="time-left" className='time-value'>
@@ -260,7 +203,7 @@ function App() {
         <Footer />
 
         <audio id="beep" ref={ beepAudio }>
-          <source src="https://res.cloudinary.com/dgquecmyz/video/upload/v1686254527/Beep_Short_01_Sound_Effect_Mp3_102_xfkfzo.mp3" type="audio/mp3" />
+          <source src="https://res.cloudinary.com/dgquecmyz/video/upload/v1686273787/button-2_evftg3.mp3" type="audio/mp3" />
           Your browser does not support the audio element.
         </audio>
 
